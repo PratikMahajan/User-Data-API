@@ -101,6 +101,7 @@ def createAccount():
         fname = request.json['fname']
         lname = request.json['lname']
         email = request.json['email']
+        password= request.json['password']
         cur = get_db().cursor()
         checkUsername = cur.execute("Select user_id from userprofile where username=? Limit 1", (username,))
         if checkUsername.fetchall():
@@ -109,9 +110,11 @@ def createAccount():
             return Response(json.dumps(response), status=406, mimetype='application/json')
 
         res = cur.execute("INSERT into userprofile (username, fname, lname, email) values(?,?,?,?);",(username,fname,lname,email))
+        res = cur.execute("INSERT into auth (username, password) values(?,?);", (username, password, ))
         get_db().commit()
         return Response(status=200)
     except Exception as e:
+        get_db().rollback()
         print (e)
         return Response(status=403)
 
@@ -122,10 +125,19 @@ def login_action():
     try:
         username = request.json['username']
         password = request.json['password']
-        # cur = get_db().cursor()
-        # get_db().commit()
-        # return username+" "+password
-        return Response(status=200)
+        cur = get_db().cursor()
+        checkUsername = cur.execute("Select username, password from auth where username=? Limit 1", (username,)).fetchall()
+        if not checkUsername:
+            response = {}
+            response["error"] = "Username not found"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
+        savedPass = checkUsername[0][1]
+        if savedPass==password:
+            return Response(status=200)
+        else:
+            response = {}
+            response["error"] = "Password Incorrect"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
     except Exception as e:
         print (e)
         return Response(status=403)
