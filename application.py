@@ -150,11 +150,24 @@ def updatePassword():
         username = request.json['username']
         oldPassword = request.json['oldPassword']
         newPassword = request.json['newPassword']
-        # cur = get_db().cursor()
-        # get_db().commit()
-        # return username+" "+newPassword
-        return Response(status=200)
+        cur = get_db().cursor()
+        checkUsername = cur.execute("Select username, password from auth where username=? Limit 1", (username,)).fetchall()
+        if not checkUsername:
+            response = {}
+            response["error"] = "Username not found"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
+        savedPass = checkUsername[0][1]
+        if savedPass == oldPassword:
+            cur.execute("UPDATE auth SET password =? where username=?", (newPassword,username,))
+            get_db().commit()
+            return Response(status=200)
+        else:
+            response = {}
+            response["error"] = "Password Incorrect"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
+
     except Exception as e:
+        get_db().rollback()
         print (e)
         return Response(status=403)
 
