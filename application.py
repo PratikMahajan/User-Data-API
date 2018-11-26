@@ -81,12 +81,36 @@ def getAccount():
         for row in res:
             items = {}
             items['user_id'] = str(row[0])
-            items['username'] = int(row[1])
+            items['username'] = str(row[1])
             items['fname'] = str(row[2])
             items['lname'] = str(row[3])
             items['email'] = str(row[4])
             return Response(json.dumps(items), status=200, mimetype='application/json')
         return Response(status=404)
+    except Exception as e:
+        print (e)
+        return Response(status=403)
+
+
+
+
+@app.route("/createAccount", methods=["POST"])
+def createAccount():
+    try:
+        username = request.json['username']
+        fname = request.json['fname']
+        lname = request.json['lname']
+        email = request.json['email']
+        cur = get_db().cursor()
+        checkUsername = cur.execute("Select user_id from userprofile where username=? Limit 1", (username,))
+        if checkUsername.fetchall():
+            response={}
+            response["error"]= "Username Taken"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
+
+        res = cur.execute("INSERT into userprofile (username, fname, lname, email) values(?,?,?,?);",(username,fname,lname,email))
+        get_db().commit()
+        return Response(status=200)
     except Exception as e:
         print (e)
         return Response(status=403)
