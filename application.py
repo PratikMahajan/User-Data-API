@@ -69,7 +69,7 @@ def init_db():
 
 
 # ------------------------------------------
-# All API endpoints here
+# All API endpoints
 # ------------------------------------------
 
 @app.route("/getAccount", methods=["POST"])
@@ -179,11 +179,24 @@ def updateUsername():
         oldUsername = request.json['oldUsername']
         newUsername = request.json['newUsername']
         password = request.json['password']
-        # cur = get_db().cursor()
-        # get_db().commit()
-        # return newUsername+" "+password
-        return Response(status=200)
+        cur = get_db().cursor()
+        checkUsername = cur.execute("Select username, password from auth where username=? Limit 1", (oldUsername,)).fetchall()
+        if not checkUsername:
+            response = {}
+            response["error"] = "Username not found"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
+        savedPass = checkUsername[0][1]
+        if savedPass == password:
+            cur.execute("UPDATE auth SET username =? where username=?", (newUsername, oldUsername,))
+            cur.execute("UPDATE userprofile SET username =? where username=?", (newUsername, oldUsername,))
+            get_db().commit()
+            return Response(status=200)
+        else:
+            response = {}
+            response["error"] = "Password Incorrect"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
     except Exception as e:
+        get_db().rollback()
         print (e)
         return Response(status=403)
 
@@ -192,14 +205,23 @@ def updateUsername():
 @app.route("/updateProfile", methods=["POST"])
 def updateProfile():
     try:
+        userid = request.json['userid']
         fName = request.json['fname']
         lName = request.json['lname']
         email = request.json['email']
-        # cur = get_db().cursor()
-        # get_db().commit()
-        # return fName+" "+lName+" "+email
+        cur = get_db().cursor()
+        checkUserid = cur.execute("Select user_id from userprofile where user_id=? Limit 1",(userid,)).fetchall()
+        if not checkUserid:
+            response = {}
+            response["error"] = "UserID not found"
+            return Response(json.dumps(response), status=406, mimetype='application/json')
+
+        cur.execute("UPDATE userprofile SET fname=?, lname=?, email=? where user_id=?", (fName, lName,email, userid,))
+        get_db().commit()
         return Response(status=200)
+
     except Exception as e:
+        get_db().rollback()
         print (e)
         return Response(status=403)
 
