@@ -31,8 +31,8 @@ logging.basicConfig(level=logging.DEBUG,
 if not os.path.exists(DATABASE):
     conn = sqlite3.connect(DATABASE)
     cur = conn.cursor()
-    cur.execute("CREATE TABLE userprofile (user_id int unique NOT NULL AUTOINCREMENT, username varchar(50),fname varchar(20), lname varchar(20), email varchar(100) );")
-    cur.execute("CREATE TABLE auth(username varchar(50) unique NOT NULL AUTOINCREMENT, password varchar(300));")
+    cur.execute("CREATE TABLE userprofile (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username varchar(50),fname varchar(20), lname varchar(20), email varchar(100) );")
+    cur.execute("CREATE TABLE auth(username varchar(50) PRIMARY KEY, password varchar(300));")
     conn.commit()
     conn.close()
 
@@ -68,18 +68,28 @@ def init_db():
 
 
 
-
-
-
-
-
 # ------------------------------------------
 # All API endpoints here
 # ------------------------------------------
 
-@app.route("/getAccount", methods=["GET"])
+@app.route("/getAccount", methods=["POST"])
 def getAccount():
-    return "hello"
+    try:
+        username = request.json['username']
+        cur = get_db().cursor()
+        res = cur.execute("Select user_id, username, fname, lname, email from userprofile where username=? Limit 1",(username,))
+        for row in res:
+            items = {}
+            items['user_id'] = str(row[0])
+            items['username'] = int(row[1])
+            items['fname'] = str(row[2])
+            items['lname'] = str(row[3])
+            items['email'] = str(row[4])
+            return Response(json.dumps(items), status=200, mimetype='application/json')
+        return Response(status=404)
+    except Exception as e:
+        print (e)
+        return Response(status=403)
 
 
 
@@ -94,7 +104,7 @@ def login_action():
         return Response(status=200)
     except Exception as e:
         print (e)
-        return Response(status=510)
+        return Response(status=403)
 
 
 
@@ -110,7 +120,7 @@ def updatePassword():
         return Response(status=200)
     except Exception as e:
         print (e)
-        return Response(status=510)
+        return Response(status=403)
 
 
 
@@ -126,7 +136,7 @@ def updateUsername():
         return Response(status=200)
     except Exception as e:
         print (e)
-        return Response(status=510)
+        return Response(status=403)
 
 
 
@@ -142,7 +152,7 @@ def updateProfile():
         return Response(status=200)
     except Exception as e:
         print (e)
-        return Response(status=510)
+        return Response(status=403)
 
 
 
