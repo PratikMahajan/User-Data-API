@@ -31,8 +31,9 @@ logging.basicConfig(level=logging.DEBUG,
 if not os.path.exists(DATABASE):
     conn = sqlite3.connect(DATABASE)
     cur = conn.cursor()
-    cur.execute("CREATE TABLE userprofile (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username varchar(50),fname varchar(20), lname varchar(20), email varchar(100) );")
-    cur.execute("CREATE TABLE auth(username varchar(50) PRIMARY KEY, password varchar(300));")
+    cur.execute("CREATE TABLE userprofile (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username varchar(50),fname varchar(20), lname varchar(20), email varchar(100), role varchar(15) );")
+    cur.execute("CREATE TABLE auth(username varchar(50) PRIMARY KEY, password varchar(300), role varchar(15));")
+    cur.execute("CREATE TABLE verification(username varchar(50) PRIMARY KEY, verify int);")
     conn.commit()
     conn.close()
 
@@ -77,7 +78,7 @@ def getAccount():
     try:
         username = request.json['username']
         cur = get_db().cursor()
-        res = cur.execute("Select user_id, username, fname, lname, email from userprofile where username=? Limit 1",(username,))
+        res = cur.execute("Select user_id, username, fname, lname, email, role from userprofile where username=? Limit 1",(username,))
         for row in res:
             items = {}
             items['user_id'] = str(row[0])
@@ -85,6 +86,7 @@ def getAccount():
             items['fname'] = str(row[2])
             items['lname'] = str(row[3])
             items['email'] = str(row[4])
+            items['role'] = str(row[5])
             return Response(json.dumps(items), status=200, mimetype='application/json')
         return Response(status=404)
     except Exception as e:
@@ -102,6 +104,7 @@ def createAccount():
         lname = request.json['lname']
         email = request.json['email']
         password= request.json['password']
+        role= request.json['role']
         cur = get_db().cursor()
         checkUsername = cur.execute("Select user_id from userprofile where username=? Limit 1", (username,))
         if checkUsername.fetchall():
@@ -109,8 +112,9 @@ def createAccount():
             response["error"]= "Username Taken"
             return Response(json.dumps(response), status=406, mimetype='application/json')
 
-        res = cur.execute("INSERT into userprofile (username, fname, lname, email) values(?,?,?,?);",(username,fname,lname,email))
-        res = cur.execute("INSERT into auth (username, password) values(?,?);", (username, password, ))
+        res = cur.execute("INSERT into userprofile (username, fname, lname, email, role) values(?,?,?,?,?);",(username,fname,lname,email,role))
+        res = cur.execute("INSERT into auth (username, password, role) values(?,?,?);", (username, password, role,))
+        res = cur.execute("INSERT into verification (username, verify) values(?,?);", (username, 0,))
         get_db().commit()
         return Response(status=200)
     except Exception as e:
@@ -119,21 +123,30 @@ def createAccount():
         return Response(status=403)
 
 
-
 @app.route("/login", methods=["POST"])
 def login_action():
     try:
         username = request.json['username']
         password = request.json['password']
         cur = get_db().cursor()
-        checkUsername = cur.execute("Select username, password from auth where username=? Limit 1", (username,)).fetchall()
+        checkUsername = cur.execute("Select username, password, role from auth where username=? Limit 1", (username,)).fetchall()
         if not checkUsername:
             response = {}
             response["error"] = "Username not found"
             return Response(json.dumps(response), status=406, mimetype='application/json')
         savedPass = checkUsername[0][1]
         if savedPass==password:
-            return Response(status=200)
+
+            user_id = cur.execute("Select user_id from userprofile where username=? Limit 1",
+                                        (username,)).fetchall()
+            verify = cur.execute("Select verify from verification where username=? Limit 1",
+                                  (username,)).fetchall()
+
+            response = {}
+            response["role"] = checkUsername[0][2]
+            response["userid"] = str(user_id[0][0])
+            response["verify"] = verify[0][0]
+            return Response(json.dumps(response), status=200, mimetype='application/json')
         else:
             response = {}
             response["error"] = "Password Incorrect"
@@ -224,6 +237,43 @@ def updateProfile():
         get_db().rollback()
         print (e)
         return Response(status=403)
+
+
+@app.route("/setVerify", methods=["POST"])
+def setVerify():
+    try:
+        username = request.json['address']
+        verify = request.json['bool']
+
+        cur = get_db().cursor()
+
+        cur.execute("UPDATE verification SET verify=? where username=?", (verify, username,))
+        get_db().commit()
+        return Response(status=200)
+
+    except Exception as e:
+        get_db().rollback()
+        print (e)
+        return Response(status=403)
+
+
+@app.route("/getVerify", methods=["POST"])
+def getVerify():
+    try:
+        address = request.json['address']
+        cur = get_db().cursor()
+        res = cur.execute("Select verify from verification where username=? LIMIT 1;", (address,))
+        for row in res:
+            items = {}
+            items['bool'] = int(row[0])
+
+            return Response(json.dumps(items), status=200, mimetype='application/json')
+        return Response(status=430)
+    except Exception as e:
+        logging.debug("Error in receive Verify" + str(e))
+        return Response(status=430)
+
+
 
 
 
