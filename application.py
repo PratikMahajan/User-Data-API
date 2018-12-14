@@ -35,6 +35,7 @@ if not os.path.exists(DATABASE):
     cur.execute("CREATE TABLE auth(username varchar(50) PRIMARY KEY, password varchar(300), role varchar(15));")
     cur.execute("CREATE TABLE verification(username varchar(50) PRIMARY KEY, verify int);")
     cur.execute("CREATE TABLE balance(username varchar(50) PRIMARY KEY, balance varchar(20));")
+    cur.execute("CREATE TABLE coins(username varchar(50) PRIMARY KEY, coins varchar(20));")
     conn.commit()
     conn.close()
 
@@ -117,6 +118,7 @@ def createAccount():
         res = cur.execute("INSERT into auth (username, password, role) values(?,?,?);", (username, password, role,))
         res = cur.execute("INSERT into verification (username, verify) values(?,?);", (username, 0,))
         res = cur.execute("INSERT into balance (username, balance) values(?,?);", (username, "0",))
+        res = cur.execute("INSERT into coins (username, coins) values(?,?);", (username, "0",))
         get_db().commit()
         return Response(status=200)
     except Exception as e:
@@ -324,6 +326,62 @@ def getBalance():
     except Exception as e:
         logging.debug("Error in add money" + str(e))
         return Response(status=430)
+
+
+
+
+
+@app.route("/addCoins", methods=["POST"])
+def addCoins():
+    try:
+        address = request.json['address']
+        amount = float(request.json['amount'])
+        cur = get_db().cursor()
+        exist = 0
+        res = cur.execute("Select coins from coins where username=? LIMIT 1;", (address,))
+        for row in res:
+            exist = float(row[0])
+        amount += exist
+
+        res = cur.execute("update coins set coins=? where username=?;", (str(amount),address,))
+
+        res = cur.execute("Select coins from coins where username=? LIMIT 1;", (address,))
+        for row in res:
+            items = {}
+            items['balance'] = float(row[0])
+            # print items
+            get_db().commit()
+            return Response(json.dumps(items), status=200, mimetype='application/json')
+
+
+        return Response(json.dumps(items), status=430)
+
+    except Exception as e:
+        get_db().rollback()
+        logging.debug("Error in add coins" + str(e))
+        return Response(status=430)
+
+
+@app.route("/getCoins", methods=["POST"])
+def getCoins():
+    try:
+        address = request.json['address']
+        cur = get_db().cursor()
+        res = cur.execute("Select coins from coins where username=? LIMIT 1;", (address,))
+        for row in res:
+            items = {}
+            items['balance'] = float(row[0])
+            return Response(json.dumps(items), status=200, mimetype='application/json')
+
+        return Response(json.dumps(items), status=430)
+    except Exception as e:
+        logging.debug("Error in get coins" + str(e))
+        return Response(status=430)
+
+
+
+
+
 
 # ------------------------------------------
 # ------------------------------------------
