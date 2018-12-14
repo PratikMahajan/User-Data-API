@@ -34,6 +34,7 @@ if not os.path.exists(DATABASE):
     cur.execute("CREATE TABLE userprofile (user_id INTEGER PRIMARY KEY AUTOINCREMENT, username varchar(50),fname varchar(20), lname varchar(20), email varchar(100), role varchar(15) );")
     cur.execute("CREATE TABLE auth(username varchar(50) PRIMARY KEY, password varchar(300), role varchar(15));")
     cur.execute("CREATE TABLE verification(username varchar(50) PRIMARY KEY, verify int);")
+    cur.execute("CREATE TABLE balance(username varchar(50) PRIMARY KEY, balance varchar(20));")
     conn.commit()
     conn.close()
 
@@ -115,6 +116,7 @@ def createAccount():
         res = cur.execute("INSERT into userprofile (username, fname, lname, email, role) values(?,?,?,?,?);",(username,fname,lname,email,role))
         res = cur.execute("INSERT into auth (username, password, role) values(?,?,?);", (username, password, role,))
         res = cur.execute("INSERT into verification (username, verify) values(?,?);", (username, 0,))
+        res = cur.execute("INSERT into balance (username, balance) values(?,?);", (username, "0",))
         get_db().commit()
         return Response(status=200)
     except Exception as e:
@@ -141,11 +143,13 @@ def login_action():
                                         (username,)).fetchall()
             verify = cur.execute("Select verify from verification where username=? Limit 1",
                                   (username,)).fetchall()
-
+            balance = cur.execute("Select balance from balance where username=? Limit 1",
+                                 (username,)).fetchall()
             response = {}
             response["role"] = checkUsername[0][2]
             response["userid"] = str(user_id[0][0])
             response["verify"] = verify[0][0]
+            response["balance"] = float(balance[0][0])
             return Response(json.dumps(response), status=200, mimetype='application/json')
         else:
             response = {}
@@ -274,9 +278,52 @@ def getVerify():
         return Response(status=430)
 
 
+@app.route("/addMoney", methods=["POST"])
+def addMoney():
+    try:
+        address = request.json['address']
+        amount = float(request.json['amount'])
+        cur = get_db().cursor()
+        exist = 0
+        res = cur.execute("Select balance from balance where username=? LIMIT 1;", (address,))
+        for row in res:
+            exist = float(row[0])
+        amount += exist
+
+        res = cur.execute("update balance set balance=? where username=?;", (str(amount),address,))
+
+        res = cur.execute("Select balance from balance where username=? LIMIT 1;", (address,))
+        for row in res:
+            items = {}
+            items['balance'] = float(row[0])
+            # print items
+            get_db().commit()
+            return Response(json.dumps(items), status=200, mimetype='application/json')
 
 
+        return Response(json.dumps(items), status=430)
 
+    except Exception as e:
+        get_db().rollback()
+        logging.debug("Error in add money" + str(e))
+        return Response(status=430)
+
+
+@app.route("/getBalance", methods=["POST"])
+def getBalance():
+    try:
+        address = request.json['address']
+        cur = get_db().cursor()
+        res = cur.execute("Select balance from balance where username=? LIMIT 1;", (address,))
+        for row in res:
+            items = {}
+            items['balance'] = float(row[0])
+            return Response(json.dumps(items), status=200, mimetype='application/json')
+
+        return Response(json.dumps(items), status=430)
+    except Exception as e:
+        logging.debug("Error in add money" + str(e))
+        return Response(status=430)
 
 # ------------------------------------------
 # ------------------------------------------
